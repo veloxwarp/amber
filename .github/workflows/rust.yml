@@ -49,9 +49,10 @@ jobs:
 
   linux-binary:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
     - uses: taiki-e/install-action@v2
       with:
         tool: cross@0.2.5
@@ -90,9 +91,10 @@ jobs:
 
   macos-binary:
     runs-on: macos-latest
-
+    permissions:
+      contents: write
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
     - uses: dtolnay/rust-toolchain@master
       with:
         toolchain: 1.94.1
@@ -119,7 +121,8 @@ jobs:
 
   windows-binary:
     runs-on: windows-latest
-
+    permissions:
+      contents: write
     steps:
     - uses: actions/checkout@v2
     - uses: dtolnay/rust-toolchain@master
