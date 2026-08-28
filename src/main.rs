@@ -222,4 +222,26 @@ mod tests {
             "'$HOME $(echo nope) can'\"'\"'t'"
         );
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn shell_quote_round_trips_through_a_posix_shell() {
+        for value in [
+            "$HOME",
+            "$(printf injected)",
+            "`printf injected`",
+            "single'quote",
+            "double\"quote",
+            r"back\\slash",
+            "",
+            "first line\nsecond line",
+        ] {
+            let output = std::process::Command::new("sh")
+                .args(["-c", &format!("printf %s {}", shell_quote(value))])
+                .output()
+                .unwrap();
+            assert!(output.status.success());
+            assert_eq!(output.stdout, value.as_bytes(), "failed to quote {value:?}");
+        }
+    }
 }
