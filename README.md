@@ -1,8 +1,8 @@
 # amber
 
-[![Rust](https://github.com/fpco/amber/actions/workflows/rust.yml/badge.svg)](https://github.com/fpco/amber/actions/workflows/rust.yml)
+[![Rust](https://github.com/veloxwarp/amber/actions/workflows/rust.yml/badge.svg)](https://github.com/veloxwarp/amber/actions/workflows/rust.yml)
 
-Manage secret values in-repo via public key cryptography. See [the announcement blog post](https://www.fpcomplete.com/blog/announcing-amber-ci-secret-tool/) for more motivation.
+Manage encrypted secrets in version control using public-key cryptography.
 
 Amber provides the ability to securely store secret data in a plain-text file. Secrets can be encrypted by anyone with access to the file, without the ability to read those files without a secret key. The file format is a plain text YAML file which minimizes diffs on value changes, making it amenable to tracking changes in version control.
 
@@ -10,7 +10,7 @@ The primary use case for Amber is storing secret values for Continuous Integrati
 
 ## Install
 
-See below for OS specific packages. Alternatively, you can install from source by [installing Rust](https://www.rust-lang.org/tools/install) and running `cargo install --git https://github.com/fpco/amber`. Binaries are available on the [release page](https://github.com/fpco/amber/releases). Place the executable on your `PATH` and ensure that the executable bit is set (for non-Windows platforms).
+See below for OS-specific packages. Alternatively, you can install from source by [installing Rust](https://www.rust-lang.org/tools/install) and running `cargo install --git https://github.com/veloxwarp/amber`. Binaries are available on the [release page](https://github.com/veloxwarp/amber/releases). Place the executable on your `PATH` and ensure that the executable bit is set (for non-Windows platforms).
 
 ### Arch Linux
 
@@ -34,7 +34,7 @@ use [psibi/setup-amber](https://github.com/psibi/setup-amber).
 Example usage:
 
 ``` yaml
-- uses: psibi/setup-amber@v1.0
+- uses: psibi/setup-amber@v2.0.0
   with:
     amber-version: 'v0.1.3' # Optional version, otherwise latest
   env:
@@ -109,8 +109,8 @@ public_key: 9a4eb57571201fe413a5a9d583a070d180669928f0b98152ad93454cf5079860
 secrets: []
 ```
 
-## Authors
+## History
 
-This tool was written by the [FP Complete](https://www.fpcomplete.com/) engineering team. It was originally part of a deployment system for our [Kube360 Kubernetes software collection](https://www.fpcomplete.com/products/kube360/). We decided to extract the generalizable parts to a standalone tool to improve Continuous Integration workflows.
+Amber originated at FP Complete, where the engineering team extracted it from deployment tooling into a standalone project for Continuous Integration workflows. The [original announcement](https://academy.fpblock.com/blog/announcing-amber-ci-secret-tool/) provides historical context. Amber is now maintained under [Velox Warp](https://github.com/veloxwarp).
 
 If you have a use case outside of CI, or additional features you think would fit in well, please let us know in the issue tracker!

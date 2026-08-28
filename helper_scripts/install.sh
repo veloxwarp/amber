@@ -3,7 +3,7 @@
 set -eu -o pipefail
 
 version_prefix=''
-tool='fpco/amber'
+tool='veloxwarp/amber'
 
 tags_url="https://github.com/${tool}/tags"
 tags="$(wget -O- "${tags_url}" | grep -o "/${tool}/releases/tag/[^\"]*")"
