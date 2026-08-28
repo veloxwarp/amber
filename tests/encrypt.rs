@@ -109,11 +109,9 @@ fn plaintext_digests_can_be_disabled() {
 
     let yaml = std::fs::read_to_string(path).unwrap();
     assert!(yaml.contains("store_plaintext_sha256: false"));
-    assert!(
-        !yaml
-            .lines()
-            .any(|line| line.trim_start().starts_with("sha256:"))
-    );
+    assert!(!yaml
+        .lines()
+        .any(|line| line.trim_start().starts_with("sha256:")));
 }
 
 #[cfg(unix)]
@@ -128,9 +126,15 @@ fn write_file_uses_owner_only_permissions() {
         .args(["write-file", "--key", "FOO", "--dest"])
         .arg(&path)
         .env("AMBER_YAML", "assets/amber-masking.yaml")
-        .env("AMBER_SECRET", "ac2af4852f3de2dc6feb19b718d1cbf6c64c1ef618dafaf2b0a89cadcde240ac")
+        .env(
+            "AMBER_SECRET",
+            "ac2af4852f3de2dc6feb19b718d1cbf6c64c1ef618dafaf2b0a89cadcde240ac",
+        )
         .status()
         .unwrap();
     assert!(status.success());
-    assert_eq!(std::fs::metadata(path).unwrap().permissions().mode() & 0o777, 0o600);
+    assert_eq!(
+        std::fs::metadata(path).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
 }

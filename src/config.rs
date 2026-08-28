@@ -26,7 +26,10 @@ struct ConfigRaw {
 
     /// Plaintext digests allow no-op updates without the private key, but leak
     /// enough information to guess low-entropy secrets offline.
-    #[serde(default = "default_store_plaintext_sha256", skip_serializing_if = "is_true")]
+    #[serde(
+        default = "default_store_plaintext_sha256",
+        skip_serializing_if = "is_true"
+    )]
     store_plaintext_sha256: bool,
 
     /// Use a Vec instead of a HashMap to get guaranteed order in the output for
