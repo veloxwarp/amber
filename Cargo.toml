@@ -27,6 +27,7 @@ crypto_box = { version = "0.9.1", features = ["seal", "rand_core", "getrandom"]}
 hex = "0.4.3"
 sha2 = "0.11.0"
 base64 = "0.22.1"
+tempfile = "3.27.0"
 
 [build-dependencies]
 anyhow = "1.0.102"
@@ -34,7 +35,6 @@ vergen-gix = { version = "9.1.0", default-features = false, features = ["build"]
 
 [dev-dependencies]
 assert_cmd = "2.2.0"
-tempfile = "3.27.0"
 
 [profile.dev]
 # Disabling debug info speeds up builds a bunch,

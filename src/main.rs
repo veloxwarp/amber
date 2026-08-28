@@ -32,9 +32,12 @@ where
 
 fn main() -> Result<()> {
     let cmd = cli::init();
-    log::debug!("{:?}", cmd);
+    log::debug!("Parsed {} command", cmd.sub.name());
     match cmd.sub {
-        cli::SubCommand::Init { only_secret_key } => init(cmd.opt, only_secret_key),
+        cli::SubCommand::Init {
+            only_secret_key,
+            no_plaintext_digests,
+        } => init(cmd.opt, only_secret_key, !no_plaintext_digests),
         cli::SubCommand::Encrypt { key, value } => encrypt(cmd.opt, key, value),
         cli::SubCommand::Generate { key } => generate(cmd.opt, key),
         cli::SubCommand::Remove { key } => remove(cmd.opt, key),
@@ -44,8 +47,8 @@ fn main() -> Result<()> {
     }
 }
 
-fn init(mut opt: cli::Opt, only_secret_key: bool) -> Result<()> {
-    let (secret_key, config) = config::Config::new();
+fn init(mut opt: cli::Opt, only_secret_key: bool, store_plaintext_sha256: bool) -> Result<()> {
+    let (secret_key, config) = config::Config::new(store_plaintext_sha256);
     let secret_key = hex::encode(secret_key.to_bytes());
 
     config.save(opt.find_amber_yaml_or_default())?;
@@ -136,7 +139,7 @@ fn print(mut opt: cli::Opt, style: cli::PrintStyle) -> Result<()> {
     match style {
         cli::PrintStyle::SetEnv => pairs
             .iter()
-            .for_each(|(key, value)| println!("export {key}={value:?}")),
+            .for_each(|(key, value)| println!("export {key}={}", shell_quote(value))),
         cli::PrintStyle::Json => {
             let secrets = to_objs(&pairs);
             serde_json::to_writer(std::io::stdout(), &secrets)?;
@@ -180,6 +183,43 @@ fn write_file(mut opt: cli::Opt, key: &str, dest: &Path) -> Result<()> {
     let config = config::Config::load(opt.find_amber_yaml()?)?;
     let secret_key = config.load_secret_key()?;
     let value = config.get_secret(key, &secret_key)?;
-    std::fs::write(dest, value)
+    write_secret_file(dest, value.as_bytes())
         .with_context(|| format!("Unable to write to file {}", dest.display()))
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
+}
+
+#[cfg(unix)]
+fn write_secret_file(dest: &Path, value: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(dest)?;
+    file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    file.write_all(value)
+}
+
+#[cfg(not(unix))]
+fn write_secret_file(dest: &Path, value: &[u8]) -> std::io::Result<()> {
+    std::fs::write(dest, value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::shell_quote;
+
+    #[test]
+    fn shell_quotes_expansions_and_single_quotes() {
+        assert_eq!(
+            shell_quote("$HOME $(echo nope) can't"),
+            "'$HOME $(echo nope) can'\"'\"'t'"
+        );
+    }
 }
