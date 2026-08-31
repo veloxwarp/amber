@@ -24,6 +24,14 @@ struct ConfigRaw {
     /// Hex encoded public key
     public_key: String,
 
+    /// Plaintext digests allow no-op updates without the private key, but leak
+    /// enough information to guess low-entropy secrets offline.
+    #[serde(
+        default = "default_store_plaintext_sha256",
+        skip_serializing_if = "is_true"
+    )]
+    store_plaintext_sha256: bool,
+
     /// Use a Vec instead of a HashMap to get guaranteed order in the output for
     /// minimal deltas
     secrets: Vec<SecretRaw>,
@@ -34,7 +42,8 @@ struct ConfigRaw {
 #[serde(deny_unknown_fields)]
 struct SecretRaw {
     name: String,
-    sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sha256: Option<String>,
     cipher: String,
 }
 
@@ -45,6 +54,7 @@ pub struct Config {
     public_key: PublicKey,
     /// Encrypted secrets
     secrets: HashMap<String, Secret>,
+    store_plaintext_sha256: bool,
 }
 
 /// The contents of an individual secret, still encrypted
@@ -52,18 +62,19 @@ pub struct Config {
 #[serde(deny_unknown_fields)]
 struct Secret {
     /// Digest of the plaintext, to avoid unnecessary updates and minimize diffs
-    sha256: [u8; 32],
+    sha256: Option<[u8; 32]>,
     /// Ciphertext encrypted with our public key
     cipher: Vec<u8>,
 }
 
 impl Config {
     /// Create a new keypair and config file
-    pub fn new() -> (SecretKey, Self) {
+    pub fn new(store_plaintext_sha256: bool) -> (SecretKey, Self) {
         let secret_key = SecretKey::generate(&mut OsRng);
         let config = Config {
             public_key: secret_key.public_key(),
             secrets: HashMap::new(),
+            store_plaintext_sha256,
         };
         (secret_key, config)
     }
@@ -98,6 +109,7 @@ impl Config {
         Ok(Config {
             public_key,
             secrets,
+            store_plaintext_sha256: raw.store_plaintext_sha256,
         })
     }
 
@@ -107,7 +119,11 @@ impl Config {
             .iter()
             .map(|(key, value)| SecretRaw {
                 name: key.clone(),
-                sha256: hex::encode(value.sha256),
+                sha256: if self.store_plaintext_sha256 {
+                    value.sha256.map(hex::encode)
+                } else {
+                    None
+                },
                 cipher: hex::encode(&value.cipher),
             })
             .collect();
@@ -115,6 +131,7 @@ impl Config {
         ConfigRaw {
             file_format_version: FILE_FORMAT_VERSION,
             public_key: hex::encode(&self.public_key),
+            store_plaintext_sha256: self.store_plaintext_sha256,
             secrets,
         }
     }
@@ -134,8 +151,9 @@ impl Config {
         let res: Result<()> = (|| {
             let parent = path.parent().context("File must have a parent directory")?;
             fs_err::create_dir_all(parent).context("Unable to create parent directory")?;
-            let mut file = fs_err::File::create(path)?;
+            let mut file = atomic_write_file::AtomicWriteFile::open(path)?;
             serde_yaml::to_writer(&mut file, &self.to_raw())?;
+            file.commit()?;
             Ok(())
         })();
         res.with_context(|| format!("Unable to write file {}", path.display()))
@@ -147,7 +165,7 @@ impl Config {
         hasher.update(value);
         let hash = hasher.finalize_reset().into();
         if let Some(old_secret) = self.secrets.get(&key) {
-            if old_secret.sha256 == hash {
+            if old_secret.sha256 == Some(hash) {
                 log::info!("New value matches old value, doing nothing");
                 return Ok(());
             } else {
@@ -164,7 +182,7 @@ impl Config {
             key,
             Secret {
                 cipher,
-                sha256: hash,
+                sha256: self.store_plaintext_sha256.then_some(hash),
             },
         );
         Ok(())
@@ -221,11 +239,16 @@ impl Config {
 
 impl Secret {
     fn from_raw(raw: SecretRaw) -> Result<(String, Self)> {
-        let digest: [u8; 32] = hex::decode(&raw.sha256)
-            .ok()
-            .context("Non-hex sha256")?
-            .try_into()
-            .map_err(|_| anyhow!("Error parsing into digest"))?;
+        let digest = raw
+            .sha256
+            .map(|sha256| {
+                hex::decode(&sha256)
+                    .ok()
+                    .context("Non-hex sha256")?
+                    .try_into()
+                    .map_err(|_| anyhow!("Error parsing into digest"))
+            })
+            .transpose()?;
         Ok((
             raw.name,
             Secret {
@@ -246,14 +269,24 @@ impl Secret {
             let mut hasher = Sha256::new();
             hasher.update(&plain);
             let digest: [u8; 32] = hasher.finalize_reset().into();
-            ensure!(
-                digest == self.sha256,
-                "Hash mismatch, expected {}, received {}",
-                hex::encode(self.sha256),
-                hex::encode(digest)
-            );
+            if let Some(expected) = self.sha256 {
+                ensure!(
+                    digest == expected,
+                    "Hash mismatch, expected {}, received {}",
+                    hex::encode(expected),
+                    hex::encode(digest)
+                );
+            }
             String::from_utf8(plain.to_vec()).context("Invalid UTF-8 encoding")
         })()
         .with_context(|| format!("Error while decrypting secret named {key}"))
     }
+}
+
+const fn default_store_plaintext_sha256() -> bool {
+    true
+}
+
+const fn is_true(value: &bool) -> bool {
+    *value
 }

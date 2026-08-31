@@ -26,6 +26,9 @@ pub enum SubCommand {
         /// Display only secret key
         #[clap(long, global = true)]
         only_secret_key: bool,
+        /// Disable plaintext SHA-256 digests in amber.yaml
+        #[clap(long)]
+        no_plaintext_digests: bool,
     },
     /// Add or update a secret
     Encrypt {
@@ -66,6 +69,20 @@ pub enum SubCommand {
         #[clap(long)]
         dest: PathBuf,
     },
+}
+
+impl SubCommand {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Init { .. } => "init",
+            Self::Encrypt { .. } => "encrypt",
+            Self::Generate { .. } => "generate",
+            Self::Remove { .. } => "remove",
+            Self::Print { .. } => "print",
+            Self::Exec { .. } => "exec",
+            Self::WriteFile { .. } => "write-file",
+        }
+    }
 }
 
 #[derive(Parser, Clone, Debug)]

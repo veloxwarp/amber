@@ -86,3 +86,155 @@ fn encrypt_stdin() {
         }]
     );
 }
+
+#[test]
+fn plaintext_digests_can_be_disabled() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("amber.yaml");
+    let status = Command::cargo_bin("amber")
+        .unwrap()
+        .args(["init", "--no-plaintext-digests", "--only-secret-key"])
+        .env("AMBER_YAML", &path)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let status = Command::cargo_bin("amber")
+        .unwrap()
+        .args(["encrypt", "LOW_ENTROPY", "password123"])
+        .env("AMBER_YAML", &path)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let yaml = std::fs::read_to_string(path).unwrap();
+    assert!(yaml.contains("store_plaintext_sha256: false"));
+    assert!(!yaml
+        .lines()
+        .any(|line| line.trim_start().starts_with("sha256:")));
+}
+
+#[test]
+fn existing_config_can_remove_digests_and_continue_to_change_secrets() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("amber.yaml");
+    let output = Command::cargo_bin("amber")
+        .unwrap()
+        .args(["init", "--only-secret-key"])
+        .env("AMBER_YAML", &path)
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let secret_key = String::from_utf8(output.stdout).unwrap();
+
+    for (key, value) in [("EXISTING", "old value"), ("UNCHANGED", "keep me")] {
+        let status = Command::cargo_bin("amber")
+            .unwrap()
+            .args(["encrypt", key, value])
+            .env("AMBER_YAML", &path)
+            .status()
+            .unwrap();
+        assert!(status.success());
+    }
+    let old_yaml = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(old_yaml.matches("sha256:").count(), 2);
+    assert!(!old_yaml.contains("store_plaintext_sha256"));
+
+    let opted_out_yaml =
+        old_yaml.replacen("secrets:", "store_plaintext_sha256: false\nsecrets:", 1);
+    std::fs::write(&path, opted_out_yaml).unwrap();
+
+    assert_eq!(
+        get_vars_with_secret(&path, &secret_key),
+        vec![
+            Pair {
+                key: "EXISTING".to_owned(),
+                value: "old value".to_owned(),
+            },
+            Pair {
+                key: "UNCHANGED".to_owned(),
+                value: "keep me".to_owned(),
+            },
+        ]
+    );
+
+    for (key, value) in [
+        ("UNCHANGED", "keep me"),
+        ("EXISTING", "new value"),
+        ("ADDED", "new secret"),
+    ] {
+        let status = Command::cargo_bin("amber")
+            .unwrap()
+            .args(["encrypt", key, value])
+            .env("AMBER_YAML", &path)
+            .status()
+            .unwrap();
+        assert!(status.success());
+    }
+
+    let migrated_yaml = std::fs::read_to_string(&path).unwrap();
+    assert!(migrated_yaml.contains("store_plaintext_sha256: false"));
+    assert!(!migrated_yaml
+        .lines()
+        .any(|line| line.trim_start().starts_with("sha256:")));
+    assert_eq!(
+        get_vars_with_secret(&path, &secret_key),
+        vec![
+            Pair {
+                key: "ADDED".to_owned(),
+                value: "new secret".to_owned(),
+            },
+            Pair {
+                key: "EXISTING".to_owned(),
+                value: "new value".to_owned(),
+            },
+            Pair {
+                key: "UNCHANGED".to_owned(),
+                value: "keep me".to_owned(),
+            },
+        ]
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn write_file_uses_owner_only_permissions() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("secret");
+    std::fs::write(&path, "old contents").unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+    let status = Command::cargo_bin("amber")
+        .unwrap()
+        .args(["write-file", "--key", "FOO", "--dest"])
+        .arg(&path)
+        .env("AMBER_YAML", "assets/amber-masking.yaml")
+        .env(
+            "AMBER_SECRET",
+            "ac2af4852f3de2dc6feb19b718d1cbf6c64c1ef618dafaf2b0a89cadcde240ac",
+        )
+        .status()
+        .unwrap();
+    assert!(status.success());
+    assert_eq!(
+        std::fs::metadata(path).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+}
+
+fn get_vars_with_secret(path: impl AsRef<Path>, secret_key: &str) -> Vec<Pair> {
+    let output = Command::cargo_bin("amber")
+        .unwrap()
+        .args(["print", "--style", "json"])
+        .env("AMBER_YAML", path.as_ref())
+        .env("AMBER_SECRET", secret_key)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
+}
