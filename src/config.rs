@@ -1,5 +1,5 @@
 use std::convert::TryInto;
-use std::{collections::HashMap, io::Write, path::Path};
+use std::{collections::HashMap, path::Path};
 
 use anyhow::*;
 use crypto_box::aead::OsRng;
@@ -151,11 +151,9 @@ impl Config {
         let res: Result<()> = (|| {
             let parent = path.parent().context("File must have a parent directory")?;
             fs_err::create_dir_all(parent).context("Unable to create parent directory")?;
-            let mut file = tempfile::NamedTempFile::new_in(parent)?;
+            let mut file = atomic_write_file::AtomicWriteFile::open(path)?;
             serde_yaml::to_writer(&mut file, &self.to_raw())?;
-            file.flush()?;
-            file.as_file().sync_all()?;
-            file.persist(path).map_err(|e| e.error)?;
+            file.commit()?;
             Ok(())
         })();
         res.with_context(|| format!("Unable to write file {}", path.display()))
