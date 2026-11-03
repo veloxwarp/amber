@@ -42,6 +42,13 @@ pub enum SubCommand {
         /// Key, must be all capital ASCII characters, digits, and underscores
         key: String,
     },
+    /// Rename a secret, preserving its encrypted value
+    Mv {
+        /// Existing key, must be all capital ASCII characters, digits, and underscores
+        source: String,
+        /// New key, must be all capital ASCII characters, digits, and underscores
+        destination: String,
+    },
     /// Remove a secret
     Remove {
         /// Key, must be all capital ASCII characters, digits, and underscores
@@ -77,6 +84,7 @@ impl SubCommand {
             Self::Init { .. } => "init",
             Self::Encrypt { .. } => "encrypt",
             Self::Generate { .. } => "generate",
+            Self::Mv { .. } => "mv",
             Self::Remove { .. } => "remove",
             Self::Print { .. } => "print",
             Self::Exec { .. } => "exec",

@@ -188,6 +188,30 @@ impl Config {
         Ok(())
     }
 
+    /// Rename a secret without changing its ciphertext
+    pub fn rename(&mut self, source: &str, destination: &str) -> Result<()> {
+        ensure!(
+            source != destination,
+            "Source and destination secret names must differ"
+        );
+        ensure!(
+            self.secrets.contains_key(source),
+            "Key does not exist: {source}"
+        );
+        ensure!(
+            !self.secrets.contains_key(destination),
+            "Secret already exists: {destination}"
+        );
+
+        let secret = self
+            .secrets
+            .remove(source)
+            .ok_or_else(|| anyhow!("Key does not exist: {source}"))?;
+        self.secrets.insert(destination.to_owned(), secret);
+        log::info!("Renamed secret {source} to {destination}");
+        Ok(())
+    }
+
     /// Remove a value, if present
     pub fn remove(&mut self, key: &str) {
         if self.secrets.remove(key).is_none() {

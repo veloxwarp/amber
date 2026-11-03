@@ -64,7 +64,7 @@ Running `amber --help` will give you full, up to date set of instructions. The `
     * Set the `AMBER_SECRET` environment variable to your secret key.
     * Use `amber print` to see a list of your secrets.
     * Use `amber exec ...` to execute subcommands with the secrets available.
-* Over time, use `amber encrypt` to add new secrets or update existing secrets, and `amber remove` to remove a secret entirely.
+* Over time, use `amber encrypt` to add new secrets or update existing secrets, `amber mv OLD NEW` to rename a secret without re-encrypting it, and `amber remove` to remove a secret entirely.
 * By storing the secrets in Git, you'll always be able to recover old secret values.
 
 Here's a sample shell session:
