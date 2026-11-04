@@ -1,5 +1,9 @@
 # Change log for Amber
 
+## Unreleased
+
+* Add `mv` subcommand to rename secrets without changing their ciphertext.
+
 ## 0.1.8
 
 * Upgrade rust toolchain to 1.94.1

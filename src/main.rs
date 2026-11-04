@@ -40,6 +40,10 @@ fn main() -> Result<()> {
         } => init(cmd.opt, only_secret_key, !no_plaintext_digests),
         cli::SubCommand::Encrypt { key, value } => encrypt(cmd.opt, key, value),
         cli::SubCommand::Generate { key } => generate(cmd.opt, key),
+        cli::SubCommand::Mv {
+            source,
+            destination,
+        } => mv(cmd.opt, source, destination),
         cli::SubCommand::Remove { key } => remove(cmd.opt, key),
         cli::SubCommand::Print { style } => print(cmd.opt, style),
         cli::SubCommand::Exec { cmd: cmd_, args } => exec(cmd.opt, cmd_, args),
@@ -111,6 +115,15 @@ fn generate(opt: cli::Opt, key: String) -> Result<()> {
     encrypt(opt, key, Some(value))?;
     println!("{}", &msg);
     Ok(())
+}
+
+fn mv(mut opt: cli::Opt, source: String, destination: String) -> Result<()> {
+    validate_key(&source)?;
+    validate_key(&destination)?;
+    let amber_yaml = opt.find_amber_yaml()?;
+    let mut config = config::Config::load(amber_yaml)?;
+    config.rename(&source, &destination)?;
+    config.save(amber_yaml)
 }
 
 fn remove(mut opt: cli::Opt, key: String) -> Result<()> {
